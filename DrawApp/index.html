@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Приложение для рисования</title>
+    <style>
+        :root{--toolbar-height:56px}
+        html,body{height:100%;margin:0;font-family:Segoe UI,Roboto,Arial}
+        #toolbar{position:fixed;top:0;left:0;right:0;height:var(--toolbar-height);display:flex;align-items:center;gap:10px;padding:8px 12px;background:#20232a;color:#fff;z-index:20}
+        #toolbar input[type=color],#toolbar input[type=range]{margin-left:6px}
+        #toolbar button{background:#61dafb;border:none;padding:8px 10px;border-radius:6px;cursor:pointer}
+        #toolbar .label{font-size:13px;opacity:0.9}
+        /* canvas-wrap now covers the whole viewport; toolbar overlays it */
+        #canvas-wrap{position:fixed;top:0;left:0;right:0;bottom:0;background:#fff}
+        canvas{display:block;width:100%;height:100%}
+        .spacer{flex:1}
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <div class="label">Кисть</div>
+        <input id="color" type="color" value="#000000" title="Цвет" />
+        <div class="label">Размер</div>
+        <input id="size" type="range" min="1" max="100" value="4" title="Размер кисти" />
+        <button id="clear">Очистить</button>
+        <button id="undo">Отменить</button>
+        <button id="save">Сохранить</button>
+        <div class="spacer"></div>
+        <div style="font-size:12px;opacity:0.8">Поддержка мыши и сенсора (pointer events)</div>
+    </div>
+
+    <div id="canvas-wrap">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const colorInput = document.getElementById('color');
+        const sizeInput = document.getElementById('size');
+        const clearBtn = document.getElementById('clear');
+        const undoBtn = document.getElementById('undo');
+        const saveBtn = document.getElementById('save');
+
+        let isDrawing = false;
+        let lastX = 0, lastY = 0;
+        let undoStack = [];
+        const MAX_UNDO = 25;
+
+        function resizeCanvas(){
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const width = Math.max(1, Math.floor(rect.width * dpr));
+            const height = Math.max(1, Math.floor(rect.height * dpr));
+            // Save current content if any
+            let prevData = null;
+            if (canvas.width && canvas.height) {
+                try { prevData = ctx.getImageData(0,0,canvas.width,canvas.height); } catch(e) { prevData = null; }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            if(prevData){
+                try{ ctx.putImageData(prevData,0,0); }catch(e){}
+            }
+        }
+
+        // Initialize size according to wrapper and fill white on first run
+        function fitCanvasToWindow(){
+            const wrap = document.getElementById('canvas-wrap');
+            canvas.style.width = wrap.clientWidth + 'px';
+            canvas.style.height = wrap.clientHeight + 'px';
+            const hadContent = undoStack.length > 0;
+            resizeCanvas();
+            if(!hadContent){
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0,0,canvas.width,canvas.height);
+                pushUndo();
+            }
+        }
+
+        window.addEventListener('resize', fitCanvasToWindow);
+        window.addEventListener('orientationchange', fitCanvasToWindow);
+        fitCanvasToWindow();
+
+        function pushUndo(){
+            try{
+                if(undoStack.length >= MAX_UNDO) undoStack.shift();
+                undoStack.push(canvas.toDataURL());
+            }catch(e){console.warn('Undo push failed', e)}
+        }
+
+        function restoreFromDataURL(dataURL){
+            const img = new Image();
+            img.onload = () => {
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                ctx.drawImage(img,0,0,canvas.width,canvas.height);
+            };
+            img.src = dataURL;
+        }
+
+        function pointerDown(e){
+            e.preventDefault();
+            pushUndo();
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            lastX = (e.clientX - rect.left) * dpr;
+            lastY = (e.clientY - rect.top) * dpr;
+            ctx.strokeStyle = colorInput.value;
+            ctx.lineWidth = sizeInput.value * (dpr);
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            (e.target).setPointerCapture && (e.target).setPointerCapture(e.pointerId);
+        }
+
+        function pointerMove(e){
+            if(!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const x = (e.clientX - rect.left) * dpr;
+            const y = (e.clientY - rect.top) * dpr;
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            lastX = x; lastY = y;
+        }
+
+        function pointerUp(e){
+            if(!isDrawing) return;
+            isDrawing = false;
+            ctx.closePath();
+            try{ (e.target).releasePointerCapture && (e.target).releasePointerCapture(e.pointerId); }catch(e){}
+        }
+
+        canvas.addEventListener('pointerdown', pointerDown);
+        canvas.addEventListener('pointermove', pointerMove);
+        window.addEventListener('pointerup', pointerUp);
+
+        clearBtn.addEventListener('click', ()=>{
+            pushUndo();
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            // keep background white
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+        });
+
+        undoBtn.addEventListener('click', ()=>{
+            if(undoStack.length===0) return;
+            const last = undoStack.pop();
+            restoreFromDataURL(last);
+        });
+
+        saveBtn.addEventListener('click', ()=>{
+            const dataURL = canvas.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.href = dataURL;
+            a.download = 'drawing.png';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        });
+
+        // Prevent scrolling on touch while drawing
+        canvas.addEventListener('touchstart', e=>{ if(e.touches.length==1) e.preventDefault(); }, {passive:false});
+
+        // Keyboard: Ctrl+Z for undo
+        window.addEventListener('keydown', (e)=>{
+            if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){
+                e.preventDefault(); undoBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>
