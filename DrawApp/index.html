@@ -5,33 +5,120 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Приложение для рисования</title>
     <style>
-        :root{--toolbar-height:56px}
-        html,body{height:100%;margin:0;font-family:Segoe UI,Roboto,Arial}
-        #toolbar{position:fixed;top:0;left:0;right:0;height:var(--toolbar-height);display:flex;align-items:center;gap:10px;padding:8px 12px;background:#20232a;color:#fff;z-index:20}
-        #toolbar input[type=color],#toolbar input[type=range]{margin-left:6px}
-        #toolbar button{background:#61dafb;border:none;padding:8px 10px;border-radius:6px;cursor:pointer}
-        #toolbar .label{font-size:13px;opacity:0.9}
-        /* canvas-wrap now covers the whole viewport; toolbar overlays it */
-        #canvas-wrap{position:fixed;top:0;left:0;right:0;bottom:0;background:#fff}
-        canvas{display:block;width:100%;height:100%}
+        :root{--sidebar-width:280px;--primary:#0f9fff;--primary-dark:#0d7acc;--bg-dark:#1a1d23;--bg-light:#f5f5f5;--text-dark:#1a1d23;--text-light:#fff;--border:#e0e0e0}
+        html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:#fff}
+        /* Sidebar */
+        #sidebar{position:fixed;top:0;left:0;width:var(--sidebar-width);height:100%;background:linear-gradient(135deg,var(--bg-dark) 0%,#24272e 100%);color:var(--text-light);z-index:30;display:flex;flex-direction:column;padding:20px 0;box-shadow:2px 0 12px rgba(0,0,0,0.15)}
+        .sidebar-header{padding:20px 15px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:20px}
+        .sidebar-header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:0.5px}
+        .sidebar-section{padding:0 15px;margin-bottom:25px}
+        .section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;opacity:0.6;margin-bottom:12px}
+        .control-group{display:flex;align-items:center;gap:10px;margin-bottom:15px}
+        .control-group .label{font-size:12px;font-weight:600;min-width:50px}
+        .control-group input[type=color]{width:50px;height:40px;border:2px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer}
+        .control-group input[type=range]{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,0.1);outline:none;-webkit-appearance:none;appearance:none}
+        .control-group input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--primary);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3)}
+        .control-group input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--primary);border:none;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3)}
+        .button-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px}
+        .button-row button{padding:12px;border:2px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);color:var(--text-light);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s}
+        .button-row button:hover{background:rgba(255,255,255,0.1);border-color:var(--primary)}
+        .button-full{width:100%;padding:12px;background:var(--primary);color:var(--text-light);border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;margin-bottom:10px}
+        .button-full:hover{background:var(--primary-dark);transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,159,255,0.3)}
+        /* Canvas area */
+        #canvas-wrap{position:fixed;top:0;left:var(--sidebar-width);right:0;bottom:0;background:linear-gradient(135deg,#fff 0%,#f8f9fa 100%)}
+        canvas{display:block;width:100%;height:100%;background:#fff}
         .spacer{flex:1}
+        /* Modal */
+        #saveModal,#galleryModal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:100;justify-content:center;align-items:center;backdrop-filter:blur(4px)}
+        #saveModal.active,#galleryModal.active{display:flex}
+        .modal-content{background:var(--text-light);padding:40px;border-radius:16px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+        .modal-content h2{margin:0 0 24px 0;color:var(--text-dark);font-size:22px;font-weight:700}
+        .modal-content input,.modal-content textarea{width:100%;padding:12px 16px;margin:12px 0;border:2px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;transition:all 0.2s}
+        .modal-content input:focus,.modal-content textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(15,159,255,0.1)}
+        .modal-content .modal-buttons{display:flex;gap:10px;margin-top:24px;justify-content:flex-end}
+        .modal-content button{background:var(--primary);border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-light);transition:all 0.2s}
+        .modal-content button:hover{background:var(--primary-dark);transform:translateY(-1px)}
+        .modal-content button.cancel{background:#999}
+        .modal-content button.cancel:hover{background:#777}
+        /* Gallery */
+        #galleryContent{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;max-height:60vh;overflow-y:auto;margin-top:15px}
+        .gallery-item{position:relative;border:2px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:all 0.3s;background:var(--bg-light)}
+        .gallery-item:hover{border-color:var(--primary);box-shadow:0 8px 20px rgba(15,159,255,0.2);transform:translateY(-2px)}
+        .gallery-item img{width:100%;height:120px;object-fit:cover;display:block}
+        .gallery-item-title{font-size:12px;padding:8px;background:#f5f5f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+        .gallery-item-delete{position:absolute;top:5px;right:5px;background:rgba(255,107,107,0.9);color:var(--text-light);border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px;opacity:0;transition:opacity 0.2s;font-weight:600}
+        .gallery-item:hover .gallery-item-delete{opacity:1}
+        .gallery-item-delete:hover{background:rgba(255,82,82,0.95)}
     </style>
 </head>
 <body>
-    <div id="toolbar">
-        <div class="label">Кисть</div>
-        <input id="color" type="color" value="#000000" title="Цвет" />
-        <div class="label">Размер</div>
-        <input id="size" type="range" min="1" max="100" value="4" title="Размер кисти" />
-        <button id="clear">Очистить</button>
-        <button id="undo">Отменить</button>
-        <button id="save">Сохранить</button>
-        <div class="spacer"></div>
-        <div style="font-size:12px;opacity:0.8">Поддержка мыши и сенсора (pointer events)</div>
+    <!-- Modern Sidebar -->
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h1>🎨 DrawApp</h1>
+        </div>
+
+        <!-- Brush Settings -->
+        <div class="sidebar-section">
+            <div class="section-title">Brush</div>
+            <div class="control-group">
+                <span class="label">Color:</span>
+                <input id="color" type="color" value="#000000" title="Brush color" />
+            </div>
+            <div class="control-group">
+                <span class="label">Size:</span>
+            </div>
+            <input id="size" type="range" min="1" max="100" value="4" title="Brush size" style="width:calc(100% - 30px);margin-left:15px" />
+        </div>
+
+        <!-- Actions -->
+        <div class="sidebar-section">
+            <div class="section-title">Actions</div>
+            <div class="button-row">
+                <button id="undo" title="Cancel last action">↶ Cancel</button>
+                <button id="clear" title="Clear canvas">🗑️ Clear</button>
+            </div>
+            <button class="button-full" id="save" title="Save to gallery">💾 Save</button>
+            <button class="button-full" id="gallery" title="Open gallery">📁 Gallery</button>
+        </div>
+
+        <!-- Info -->
+        <div class="sidebar-section spacer">
+            <div style="font-size:11px;opacity:0.6;line-height:1.5">
+                ✓ Поддержка мыши<br/>
+                ✓ Сенсорный ввод<br/>
+                ✓ Локальное сохранение
+            </div>
+        </div>
     </div>
 
+    <!-- Canvas -->
     <div id="canvas-wrap">
         <canvas id="canvas"></canvas>
+    </div>
+
+    <!-- Save Modal -->
+    <div id="saveModal">
+        <div class="modal-content">
+            <h2>Save picture</h2>
+            <input id="drawingTitle" type="text" placeholder="Название рисунка" value="Picture" />
+            <div class="modal-buttons">
+                <button class="cancel" onclick="closeSaveModal()">Cancel</button>
+                <button onclick="confirmSave()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gallery Modal -->
+    <div id="galleryModal">
+        <div class="modal-content">
+            <h2>Gallery</h2>
+            <div id="galleryContent"></div>
+            <div class="modal-buttons">
+                <button onclick="clearGalleryAll()" style="background:#ff6b6b">Clear All</button>
+                <button onclick="closeGalleryModal()">Close</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -42,11 +129,146 @@
         const clearBtn = document.getElementById('clear');
         const undoBtn = document.getElementById('undo');
         const saveBtn = document.getElementById('save');
+        const galleryBtn = document.getElementById('gallery');
+        const saveModal = document.getElementById('saveModal');
+        const galleryModal = document.getElementById('galleryModal');
+        const drawingTitle = document.getElementById('drawingTitle');
 
         let isDrawing = false;
         let lastX = 0, lastY = 0;
         let undoStack = [];
         const MAX_UNDO = 25;
+        const GALLERY_KEY = 'drawingGallery';
+
+        // Gallery functions
+        function saveToGallery(title) {
+            try {
+                const dataURL = canvas.toDataURL('image/png');
+                let gallery = JSON.parse(localStorage.getItem(GALLERY_KEY) || '[]');
+                gallery.push({
+                    id: Date.now(),
+                    title: title || 'Painting',
+                    image: dataURL,
+                    date: new Date().toLocaleString('ru-RU')
+                });
+                localStorage.setItem(GALLERY_KEY, JSON.stringify(gallery));
+                showNotification('Picture saved to gallery');
+            } catch (e) {
+                console.error('Failed to save to gallery', e);
+                alert('Ошибка при сохранении в галерею');
+            }
+        }
+
+        function loadGallery() {
+            try {
+                // hide clear button if empty
+                const gallery = JSON.parse(localStorage.getItem(GALLERY_KEY) || '[]');
+                const clearBtn = document.querySelector('#galleryModal .modal-buttons button');
+                if(clearBtn) clearBtn.style.display = gallery.length ? 'inline-block' : 'none';
+                const galleryContent = document.getElementById('galleryContent');
+                galleryContent.innerHTML = '';
+                
+                if (gallery.length === 0) {
+                    galleryContent.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #999;">Gallery is empty</p>';
+                    return;
+                }
+
+                gallery.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'gallery-item';
+                    div.innerHTML = `
+                        <img src="${item.image}" alt="${item.title}" onclick="loadDrawing(${item.id})">
+                        <div class="gallery-item-title" title="${item.title}">${item.title}</div>
+                        <button class="gallery-item-delete" onclick="deleteFromGallery(${item.id})">Delete</button>
+                    `;
+                    galleryContent.appendChild(div);
+                });
+            } catch (e) {
+                console.error('Failed to load gallery', e);
+            }
+        }
+
+        function deleteFromGallery(id) {
+            try {
+                let gallery = JSON.parse(localStorage.getItem(GALLERY_KEY) || '[]');
+                gallery = gallery.filter(item => item.id !== id);
+                localStorage.setItem(GALLERY_KEY, JSON.stringify(gallery));
+                loadGallery();
+                showNotification('Picture deleted');
+            } catch (e) {
+                console.error('Failed to delete from gallery', e);
+            }
+        }
+        function clearGalleryAll() {
+            if(!confirm('Clear all gallery items? This action is irreversible.')) return;
+            try {
+                localStorage.removeItem(GALLERY_KEY);
+                loadGallery();
+                showNotification('Gallery cleared');
+            } catch(e) {
+                console.error('Failed to clear gallery', e);
+            }
+        }
+        function loadDrawing(id) {
+            try {
+                const gallery = JSON.parse(localStorage.getItem(GALLERY_KEY) || '[]');
+                const item = gallery.find(i => i.id === id);
+                if (item) {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        pushUndo();
+                        closeGalleryModal();
+                        drawingTitle.value = item.title;
+                        showNotification('Picture loaded');
+                    };
+                    img.src = item.image;
+                }
+            } catch (e) {
+                console.error('Failed to load drawing', e);
+            }
+        }
+
+        function showNotification(message) {
+            const notif = document.createElement('div');
+            notif.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#20232a;color:#fff;padding:10px 20px;border-radius:6px;z-index:200;font-size:13px';
+            notif.textContent = message;
+            document.body.appendChild(notif);
+            setTimeout(() => notif.remove(), 2000);
+        }
+
+        function openSaveModal() {
+            drawingTitle.value = 'Picture';
+            saveModal.classList.add('active');
+            drawingTitle.focus();
+        }
+
+        function closeSaveModal() {
+            saveModal.classList.remove('active');
+        }
+
+        function confirmSave() {
+            saveToGallery(drawingTitle.value);
+            closeSaveModal();
+        }
+
+        function openGalleryModal() {
+            loadGallery();
+            galleryModal.classList.add('active');
+        }
+
+        function closeGalleryModal() {
+            galleryModal.classList.remove('active');
+        }
+
+        // Close modals on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeSaveModal();
+                closeGalleryModal();
+            }
+        });
 
         function resizeCanvas(){
             const rect = canvas.getBoundingClientRect();
@@ -154,15 +376,8 @@
             restoreFromDataURL(last);
         });
 
-        saveBtn.addEventListener('click', ()=>{
-            const dataURL = canvas.toDataURL('image/png');
-            const a = document.createElement('a');
-            a.href = dataURL;
-            a.download = 'drawing.png';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        });
+        saveBtn.addEventListener('click', openSaveModal);
+        galleryBtn.addEventListener('click', openGalleryModal);
 
         // Prevent scrolling on touch while drawing
         canvas.addEventListener('touchstart', e=>{ if(e.touches.length==1) e.preventDefault(); }, {passive:false});
