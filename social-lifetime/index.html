@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lifetime on Social Media</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <h1 class="brand">How Much Life Do You Spend on Social Media?</h1>
+
+    <section class="input-area">
+      <label for="hours">Daily hours on social media</label>
+      <div class="ctrl">
+        <input id="hours" type="number" min="0" step="0.1" value="2" aria-label="Daily hours"/>
+        <button id="calc" class="btn primary">Calculate</button>
+      </div>
+      <div class="hint">Assumes 365 days/year and 16 waking hours/day.</div>
+    </section>
+
+    <section class="results" aria-live="polite">
+      <article class="card">
+        <div class="value" id="hoursYear">0</div>
+        <div class="label">Hours per year</div>
+      </article>
+
+      <article class="card">
+        <div class="value" id="daysYear">0</div>
+        <div class="label">Days per year</div>
+      </article>
+
+      <article class="card">
+        <div class="value" id="percentLife">0%</div>
+        <div class="label">% of waking life per year</div>
+      </article>
+    </section>
+
+    <footer class="foot">Built with HTML, CSS & JavaScript — dramatic dark design</footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
