@@ -1,0 +1,140 @@
+/* cyberpunk palette */
+:root {
+    --pink: #ff00ff;
+    --cyan: #00ffff;
+    --neon: #f0f;
+    --bg: #111;
+    --accent: #0ff;
+    --font: 'Orbitron', sans-serif;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+* {
+    box-sizing: border-box;
+}
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--accent);
+    font-family: var(--font);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+.container {
+    text-align: center;
+    animation: pulse 5s infinite alternate;
+}
+.title {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    position: relative;
+}
+.glitch {
+    color: var(--accent);
+    animation: glitch 1s infinite;
+}
+.glitch::before,
+.glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+}
+.glitch::before {
+    animation: glitchTop 1s infinite;
+    clip: rect(0, 900px, 0, 0);
+}
+.glitch::after {
+    animation: glitchBottom 1s infinite;
+    clip: rect(0, 900px, 0, 0);
+}
+
+.picker label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+}
+.picker input {
+    padding: 0.5rem;
+    font-size: 1rem;
+    border: 2px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+}
+
+/* lighten the default calendar icon */
+.picker input::-webkit-calendar-picker-indicator,
+.picker input::-moz-calendar-picker-indicator {
+    filter: brightness(1.5) hue-rotate(0deg);
+    animation: rainbow 3s infinite linear;
+}
+
+@keyframes rainbow {
+    from { filter: brightness(1.5) hue-rotate(0deg); }
+    to   { filter: brightness(1.5) hue-rotate(360deg); }
+}
+.countdown {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+.time-segment {
+    text-align: center;
+}
+.number {
+    font-size: 2.5rem;
+    position: relative;
+}
+.number::before,
+.number::after {
+    content: attr(data-value);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+}
+.number::before { color: var(--pink); transform: translate(2px, -2px); opacity: 0.7; }
+.number::after  { color: var(--cyan); transform: translate(-2px, 2px); opacity: 0.7; }
+
+.footer {
+    margin-top: 2rem;
+    font-size: 0.9rem;
+    color: var(--pink);
+}
+
+@keyframes glitch {
+    0% { transform: translate(0);}    
+    20% { transform: translate(-2px,2px); }
+    40% { transform: translate(2px,-2px); }
+    60% { transform: translate(-1px,1px); }
+    80% { transform: translate(1px,-1px); }
+    100% { transform: translate(0); }
+}
+@keyframes glitchTop {
+    0% { clip: rect(0,900px,0,0); transform: translate(0); }
+    20% { clip: rect(0,900px,5px,0); transform: translate(-2px,-2px); }
+    40% { clip: rect(0,900px,10px,0); transform: translate(2px,2px); }
+    60% { clip: rect(0,900px,15px,0); transform: translate(-2px,2px); }
+    80% { clip: rect(0,900px,20px,0); transform: translate(2px,-2px); }
+    100% { clip: rect(0,900px,0,0); transform: translate(0); }
+}
+@keyframes glitchBottom {
+    0% { clip: rect(0,900px,0,0); transform: translate(0); }
+    20% { clip: rect(10px,900px,30px,0); transform: translate(2px,2px); }
+    40% { clip: rect(20px,900px,40px,0); transform: translate(-2px,-2px); }
+    60% { clip: rect(30px,900px,50px,0); transform: translate(2px,-2px); }
+    80% { clip: rect(40px,900px,60px,0); transform: translate(-2px,2px); }
+    100% { clip: rect(0,900px,0,0); transform: translate(0); }
+}
+
+@keyframes pulse {
+    from { filter: hue-rotate(0deg); }
+    to { filter: hue-rotate(360deg); }
+}
