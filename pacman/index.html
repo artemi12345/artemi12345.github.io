@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pac-Man Clone</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            background-color: black;
+            border: 4px solid #222;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+
+        #score-board {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            font-size: 24px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 20px;
+            background-color: #fde047;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 5px;
+            transition: transform 0.1s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            background-color: #facc15;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            color: #fde047;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="score-board">Score: <span id="score">0</span></div>
+        
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Start/Game Over Screen -->
+        <div id="ui-overlay">
+            <h1 id="status-text">PAC-MAN</h1>
+            <button id="start-btn">START GAME</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * GAME CONFIGURATION
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const uiOverlay = document.getElementById('ui-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const statusText = document.getElementById('status-text');
+
+        const TILE_SIZE = 40;
+        let score = 0;
+        let gameRunning = false;
+        let animationId;
+
+        // Image loading
+        const playerImage = new Image();
+        playerImage.src = 'Ellipse 14.png';
+
+        const ghostImages = [
+            'Group 12 (1).png',
+            'Group 13 (1).png',
+            'Group 14.png',
+            'Group 15.png'
+        ].map(src => {
+            const img = new Image();
+            img.src = src;
+            return img;
+        });
+
+        // Map layout: 1 = Wall, 0 = Pellet, ' ' = Empty
+        const mapTemplate = [
+            ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1'],
+            ['1', '0', '0', '0', '0', '0', '0', '0', '0', '1', '0', '0', '0', '0', '0', '0', '0', '0', '1'],
+            ['1', '0', '1', '1', '0', '1', '1', '1', '0', '1', '0', '1', '1', '1', '0', '1', '1', '0', '1'],
+            ['1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '1'],
+            ['1', '0', '1', '1', '0', '1', '0', '1', '1', '1', '1', '1', '0', '1', '0', '1', '1', '0', '1'],
+            ['1', '0', '0', '0', '0', '1', '0', '0', '0', '1', '0', '0', '0', '1', '0', '0', '0', '0', '1'],
+            ['1', '1', '1', '1', '0', '1', '1', '1', '0', '1', '0', '1', '1', '1', '0', '1', '1', '1', '1'],
+            ['1', '1', '1', '1', '0', '1', '0', '0', '0', '0', '0', '0', '0', '1', '0', '1', '1', '1', '1'],
+            ['1', '1', '1', '1', '0', '1', '0', '1', '1', '1', '1', '1', '0', '1', '0', '1', '1', '1', '1'],
+            ['1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '1'],
+            ['1', '1', '1', '1', '0', '1', '0', '1', '1', '1', '1', '1', '0', '1', '0', '1', '1', '1', '1'],
+            ['1', '1', '1', '1', '0', '1', '0', '0', '0', '0', '0', '0', '0', '1', '0', '1', '1', '1', '1'],
+            ['1', '1', '1', '1', '0', '1', '0', '1', '1', '1', '1', '1', '0', '1', '0', '1', '1', '1', '1'],
+            ['1', '0', '0', '0', '0', '0', '0', '0', '0', '1', '0', '0', '0', '0', '0', '0', '0', '0', '1'],
+            ['1', '0', '1', '1', '0', '1', '1', '1', '0', '1', '0', '1', '1', '1', '0', '1', '1', '0', '1'],
+            ['1', '0', '0', '1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '1', '0', '0', '1'],
+            ['1', '1', '0', '1', '0', '1', '0', '1', '1', '1', '1', '1', '0', '1', '0', '1', '0', '1', '1'],
+            ['1', '0', '0', '0', '0', '1', '0', '0', '0', '1', '0', '0', '0', '1', '0', '0', '0', '0', '1'],
+            ['1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1']
+        ];
+
+        canvas.width = mapTemplate[0].length * TILE_SIZE;
+        canvas.height = mapTemplate.length * TILE_SIZE;
+
+        /**
+         * LOGICAL SECTIONS: CLASSES
+         */
+
+        class Boundary {
+            constructor({ position }) {
+                this.position = position;
+                this.width = TILE_SIZE;
+                this.height = TILE_SIZE;
+            }
+
+            draw() {
+                ctx.fillStyle = '#1919a6'; // Blue walls
+                ctx.fillRect(this.position.x, this.position.y, this.width, this.height);
+                // Simple inner border for aesthetic
+                ctx.strokeStyle = '#222';
+                ctx.strokeRect(this.position.x, this.position.y, this.width, this.height);
+            }
+        }
+
+        class Player {
+            constructor({ position, velocity }) {
+                this.position = position;
+                this.velocity = velocity;
+                this.radius = 18;
+                this.rotation = 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.position.x, this.position.y);
+                ctx.rotate(this.rotation);
+                ctx.translate(-this.position.x, -this.position.y);
+
+                if (playerImage.complete && playerImage.naturalWidth > 0) {
+                    const ratio = playerImage.naturalWidth / playerImage.naturalHeight;
+                    let drawWidth = this.radius * 2;
+                    let drawHeight = this.radius * 2;
+                    
+                    if (ratio > 1) drawHeight = drawWidth / ratio;
+                    else drawWidth = drawHeight * ratio;
+
+                    ctx.drawImage(
+                        playerImage, 
+                        this.position.x - drawWidth / 2, 
+                        this.position.y - drawHeight / 2, 
+                        drawWidth, 
+                        drawHeight
+                    );
+                } else {
+                    // Fallback
+                    ctx.beginPath();
+                    ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#fde047';
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            update() {
+                this.draw();
+                this.position.x += this.velocity.x;
+                this.position.y += this.velocity.y;
+            }
+        }
+
+        class Ghost {
+            constructor({ position, velocity, image }) {
+                this.position = position;
+                this.velocity = velocity;
+                this.image = image;
+                this.radius = 18;
+                this.prevCollisions = [];
+                this.speed = 1;
+            }
+
+            draw() {
+                if (this.image.complete && this.image.naturalWidth > 0) {
+                    const ratio = this.image.naturalWidth / this.image.naturalHeight;
+                    let drawWidth = this.radius * 2;
+                    let drawHeight = this.radius * 2;
+                    
+                    if (ratio > 1) drawHeight = drawWidth / ratio;
+                    else drawWidth = drawHeight * ratio;
+
+                    ctx.drawImage(
+                        this.image, 
+                        this.position.x - drawWidth / 2, 
+                        this.position.y - drawHeight / 2, 
+                        drawWidth, 
+                        drawHeight
+                    );
+                } else {
+                    // Fallback
+                    ctx.beginPath();
+                    ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'red';
+                    ctx.fill();
+                }
+            }
+
+            update() {
+                this.draw();
+                this.position.x += this.velocity.x;
+                this.position.y += this.velocity.y;
+            }
+        }
+
+        class Pellet {
+            constructor({ position }) {
+                this.position = position;
+                this.radius = 3;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'white';
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        /**
+         * GAME STATE & INITIALIZATION
+         */
+        let boundaries = [];
+        let pellets = [];
+        let player;
+        let ghosts = [];
+
+        const keys = {
+            ArrowUp: { pressed: false },
+            ArrowDown: { pressed: false },
+            ArrowLeft: { pressed: false },
+            ArrowRight: { pressed: false }
+        };
+
+        let lastKey = '';
+
+        function init() {
+            score = 0;
+            scoreElement.innerText = score;
+            boundaries = [];
+            pellets = [];
+            ghosts = [];
+            
+            mapTemplate.forEach((row, i) => {
+                row.forEach((symbol, j) => {
+                    switch (symbol) {
+                        case '1':
+                            boundaries.push(new Boundary({
+                                position: { x: TILE_SIZE * j, y: TILE_SIZE * i }
+                            }));
+                            break;
+                        case '0':
+                            pellets.push(new Pellet({
+                                position: { 
+                                    x: TILE_SIZE * j + TILE_SIZE / 2, 
+                                    y: TILE_SIZE * i + TILE_SIZE / 2 
+                                }
+                            }));
+                            break;
+                    }
+                });
+            });
+
+            player = new Player({
+                position: { 
+                    x: TILE_SIZE + TILE_SIZE / 2, 
+                    y: TILE_SIZE + TILE_SIZE / 2 
+                },
+                velocity: { x: 0, y: 0 }
+            });
+
+            // Spawn multiple ghosts with different images and positions
+            const ghostStarts = [
+                { x: 1, y: 17 },
+                { x: 4, y: 17 },
+                { x: 14, y: 17 },
+                { x: 17, y: 17 }
+            ];
+
+            ghostStarts.forEach((start, index) => {
+                ghosts.push(new Ghost({
+                    position: { 
+                        x: TILE_SIZE * start.x + TILE_SIZE / 2, 
+                        y: TILE_SIZE * start.y + TILE_SIZE / 2 
+                    },
+                    velocity: { x: index % 2 === 0 ? 1 : -1, y: 0 },
+                    image: ghostImages[index % ghostImages.length]
+                }));
+            });
+        }
+
+        /**
+         * LOGICAL SECTIONS: COLLISION & MOVEMENT
+         */
+
+        function circleCollidesWithRectangle({ circle, rectangle }) {
+            return (
+                circle.position.y - circle.radius + circle.velocity.y <= rectangle.position.y + rectangle.height &&
+                circle.position.x + circle.radius + circle.velocity.x >= rectangle.position.x &&
+                circle.position.y + circle.radius + circle.velocity.y >= rectangle.position.y &&
+                circle.position.x - circle.radius + circle.velocity.x <= rectangle.position.x + rectangle.width
+            );
+        }
+
+        /**
+         * LOGICAL SECTIONS: RENDERING & MAIN LOOP
+         */
+
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Handle Input for Player
+            const speed = 2;
+            
+            function wouldCollide(velocity) {
+                for (let i = 0; i < boundaries.length; i++) {
+                    if (circleCollidesWithRectangle({
+                        circle: { ...player, velocity },
+                        rectangle: boundaries[i]
+                    })) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            if (keys.ArrowUp.pressed && lastKey === 'ArrowUp') {
+                if (!wouldCollide({ x: 0, y: -speed })) {
+                    player.velocity.x = 0;
+                    player.velocity.y = -speed;
+                }
+            } else if (keys.ArrowDown.pressed && lastKey === 'ArrowDown') {
+                if (!wouldCollide({ x: 0, y: speed })) {
+                    player.velocity.x = 0;
+                    player.velocity.y = speed;
+                }
+            } else if (keys.ArrowLeft.pressed && lastKey === 'ArrowLeft') {
+                if (!wouldCollide({ x: -speed, y: 0 })) {
+                    player.velocity.x = -speed;
+                    player.velocity.y = 0;
+                }
+            } else if (keys.ArrowRight.pressed && lastKey === 'ArrowRight') {
+                if (!wouldCollide({ x: speed, y: 0 })) {
+                    player.velocity.x = speed;
+                    player.velocity.y = 0;
+                }
+            }
+
+            // Detect collision with ghost (Game Over)
+            for (let i = ghosts.length - 1; 0 <= i; i--) {
+                const ghost = ghosts[i];
+                if (Math.hypot(
+                    ghost.position.x - player.position.x,
+                    ghost.position.y - player.position.y
+                ) < ghost.radius + player.radius) {
+                    gameOver("GAME OVER");
+                }
+            }
+
+            // Win condition
+            if (pellets.length === 0) {
+                gameOver("YOU WIN!");
+            }
+
+            // Pellet collection
+            for (let i = pellets.length - 1; 0 <= i; i--) {
+                const pellet = pellets[i];
+                pellet.draw();
+
+                if (Math.hypot(
+                    pellet.position.x - player.position.x,
+                    pellet.position.y - player.position.y
+                ) < pellet.radius + player.radius) {
+                    pellets.splice(i, 1);
+                    score += 10;
+                    scoreElement.innerText = score;
+                }
+            }
+
+            boundaries.forEach(boundary => {
+                boundary.draw();
+                if (circleCollidesWithRectangle({ circle: player, rectangle: boundary })) {
+                    player.velocity.x = 0;
+                    player.velocity.y = 0;
+                }
+            });
+
+            player.update();
+
+            // Rotation for Pac-Man direction
+            if (player.velocity.x > 0) player.rotation = 0;
+            else if (player.velocity.x < 0) player.rotation = Math.PI;
+            else if (player.velocity.y > 0) player.rotation = Math.PI / 2;
+            else if (player.velocity.y < 0) player.rotation = Math.PI * 1.5;
+
+            ghosts.forEach(ghost => {
+                // Проверка столкновения со стенами для текущего направления
+                boundaries.forEach(boundary => {
+                    if (circleCollidesWithRectangle({
+                        circle: ghost,
+                        rectangle: boundary
+                    })) {
+                        // Если призрак коснулся стены, останавливаем его и сбрасываем путь
+                        ghost.velocity.x = 0;
+                        ghost.velocity.y = 0;
+                    }
+                });
+
+                const collisions = [];
+                boundaries.forEach(boundary => {
+                    if (!collisions.includes('right') && circleCollidesWithRectangle({
+                        circle: { ...ghost, velocity: { x: ghost.speed, y: 0 } },
+                        rectangle: boundary
+                    })) {
+                        collisions.push('right');
+                    }
+                    if (!collisions.includes('left') && circleCollidesWithRectangle({
+                        circle: { ...ghost, velocity: { x: -ghost.speed, y: 0 } },
+                        rectangle: boundary
+                    })) {
+                        collisions.push('left');
+                    }
+                    if (!collisions.includes('up') && circleCollidesWithRectangle({
+                        circle: { ...ghost, velocity: { x: 0, y: -ghost.speed } },
+                        rectangle: boundary
+                    })) {
+                        collisions.push('up');
+                    }
+                    if (!collisions.includes('down') && circleCollidesWithRectangle({
+                        circle: { ...ghost, velocity: { x: 0, y: ghost.speed } },
+                        rectangle: boundary
+                    })) {
+                        collisions.push('down');
+                    }
+                });
+
+                if (collisions.length > ghost.prevCollisions.length) {
+                    ghost.prevCollisions = collisions;
+                }
+
+                if (JSON.stringify(collisions) !== JSON.stringify(ghost.prevCollisions) || (ghost.velocity.x === 0 && ghost.velocity.y === 0)) {
+                    // Собираем доступные направления (где нет стен)
+                    const availableDirections = [];
+                    if (!collisions.includes('right')) availableDirections.push('right');
+                    if (!collisions.includes('left')) availableDirections.push('left');
+                    if (!collisions.includes('up')) availableDirections.push('up');
+                    if (!collisions.includes('down')) availableDirections.push('down');
+
+                    if (availableDirections.length > 0) {
+                        const direction = availableDirections[Math.floor(Math.random() * availableDirections.length)];
+
+                        switch (direction) {
+                            case 'down':
+                                ghost.velocity.y = ghost.speed;
+                                ghost.velocity.x = 0;
+                                break;
+                            case 'up':
+                                ghost.velocity.y = -ghost.speed;
+                                ghost.velocity.x = 0;
+                                break;
+                            case 'right':
+                                ghost.velocity.y = 0;
+                                ghost.velocity.x = ghost.speed;
+                                break;
+                            case 'left':
+                                ghost.velocity.y = 0;
+                                ghost.velocity.x = -ghost.speed;
+                                break;
+                        }
+                    }
+                    ghost.prevCollisions = collisions;
+                }
+                
+                ghost.update();
+            });
+        }
+
+        /**
+         * LOGICAL SECTIONS: INPUT CONTROLS
+         */
+
+        window.addEventListener('keydown', ({ key }) => {
+            if (keys.hasOwnProperty(key)) {
+                keys[key].pressed = true;
+                lastKey = key;
+            }
+        });
+
+        window.addEventListener('keyup', ({ key }) => {
+            if (keys.hasOwnProperty(key)) {
+                keys[key].pressed = false;
+            }
+        });
+
+        /**
+         * GAME FLOW MANAGEMENT
+         */
+
+        function gameOver(text) {
+            cancelAnimationFrame(animationId);
+            gameRunning = false;
+            statusText.innerText = text;
+            startBtn.innerText = "RESTART";
+            uiOverlay.classList.remove('hidden');
+        }
+
+        startBtn.addEventListener('click', () => {
+            uiOverlay.classList.add('hidden');
+            init();
+            if (!gameRunning) {
+                gameRunning = true;
+                animate();
+            }
+        });
+
+        // Initial render of the maze
+        init();
+        boundaries.forEach(b => b.draw());
+        pellets.forEach(p => p.draw());
+        player.draw();
+
+    </script>
+</body>
+</html>
